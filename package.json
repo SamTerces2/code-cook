@@ -1,0 +1,260 @@
+{
+  "name": "code-cook-intelligent",
+  "displayName": "Code Cook: Intelligent Coding Assistant",
+  "description": "A multi-LLM coding assistant for VS Code. Chat, generate, debug and improve code using Claude, ChatGPT, or local Ollama models. Fully Copilot-like UI.",
+  "version": "0.1.0",
+  "publisher": "Sam-Codings-2026",
+  "icon": "media/icon.png",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SamTerces2/code-cook"
+  },
+  "categories": [
+    "Programming Languages",
+    "Machine Learning",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "claude",
+    "chatgpt",
+    "ollama",
+    "assistant",
+    "coding",
+    "chat",
+    "code cook",
+    "copilot",
+    "developer"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:claude-cook.openChat",
+    "onCommand:claude-cook.explainCode",
+    "onCommand:claude-cook.generateCode",
+    "onCommand:claude-cook.fixCode",
+    "onCommand:claude-cook.addToChat",
+    "onCommand:claude-cook.clearChat",
+    "onCommand:claude-cook.switchProvider",
+    "onCommand:claude-cook.configureApiKeys",
+    "onView:claude-cook.chatView"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "claude-cook-sidebar",
+          "title": "Code Cook",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "claude-cook-sidebar": [
+        {
+          "type": "webview",
+          "id": "claude-cook.chatView",
+          "name": "AI Assistant"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "claude-cook.openChat",
+        "title": "Open AI Chat",
+        "category": "Code Cook"
+      },
+      {
+        "command": "claude-cook.explainCode",
+        "title": "Explain Selected Code",
+        "category": "Code Cook"
+      },
+      {
+        "command": "claude-cook.generateCode",
+        "title": "Generate Code from Prompt",
+        "category": "Code Cook"
+      },
+      {
+        "command": "claude-cook.fixCode",
+        "title": "Fix or Improve Selected Code",
+        "category": "Code Cook"
+      },
+      {
+        "command": "claude-cook.addToChat",
+        "title": "Add Selection to Chat",
+        "category": "Code Cook"
+      },
+      {
+        "command": "claude-cook.clearChat",
+        "title": "Clear Chat History",
+        "category": "Code Cook"
+      },
+      {
+        "command": "claude-cook.switchProvider",
+        "title": "Switch AI Provider",
+        "category": "Code Cook"
+      },
+      {
+        "command": "claude-cook.configureApiKeys",
+        "title": "Configure API Keys",
+        "category": "Code Cook"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "editorHasSelection",
+          "command": "claude-cook.explainCode",
+          "group": "code-cook@1"
+        },
+        {
+          "when": "editorHasSelection",
+          "command": "claude-cook.fixCode",
+          "group": "code-cook@2"
+        },
+        {
+          "when": "editorHasSelection",
+          "command": "claude-cook.addToChat",
+          "group": "code-cook@3"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "claude-cook.clearChat",
+          "when": "view == claude-cook.chatView",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Code Cook",
+      "properties": {
+        "claudeCook.anthropicApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Your Anthropic (Claude) API key.",
+          "order": 1
+        },
+        "claudeCook.openaiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Your OpenAI (ChatGPT) API key.",
+          "order": 2
+        },
+        "claudeCook.defaultProvider": {
+          "type": "string",
+          "enum": [
+            "claude",
+            "openai",
+            "ollama"
+          ],
+          "default": "claude",
+          "description": "Default AI provider to use when sending prompts.",
+          "order": 3
+        },
+        "claudeCook.claudeModel": {
+          "type": "string",
+          "enum": [
+            "claude-sonnet-4-20250514",
+            "claude-3-5-sonnet-20241022",
+            "claude-opus-4-20250514"
+          ],
+          "default": "claude-sonnet-4-20250514",
+          "description": "Default Claude model for AI responses.",
+          "order": 4
+        },
+        "claudeCook.openaiModel": {
+          "type": "string",
+          "enum": [
+            "gpt-4-turbo-preview",
+            "gpt-4",
+            "gpt-3.5-turbo"
+          ],
+          "default": "gpt-4-turbo-preview",
+          "description": "Default OpenAI model to use.",
+          "order": 5
+        },
+        "claudeCook.ollamaModel": {
+          "type": "string",
+          "enum": [
+            "llama3.1",
+            "deepseek-coder",
+            "deepseek-coder:1.5b",
+            "deepseek-coder:6.7b",
+            "deepseek-coder:33b",
+            "mistral",
+            "codellama",
+            "phi3"
+          ],
+          "default": "llama3.1",
+          "description": "Local Ollama model to use (Llama, DeepSeek Coder, Mistral, Codellama, etc).",
+          "order": 6
+        },
+        "claudeCook.maxTokens": {
+          "type": "number",
+          "default": 4000,
+          "description": "Maximum number of tokens for AI responses.",
+          "order": 7
+        },
+        "claudeCook.temperature": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Temperature sampling for AI responses (lower = more accurate).",
+          "order": 8
+        },
+        "claudeCook.includeFileContext": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically include current file or selection context in messages.",
+          "order": 9
+        },
+        "claudeCook.autoApplyChanges": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically apply code edits suggested by the AI where possible.",
+          "order": 10
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "claude-cook.openChat",
+        "key": "ctrl+shift+l",
+        "mac": "cmd+shift+l"
+      },
+      {
+        "command": "claude-cook.explainCode",
+        "key": "ctrl+shift+e",
+        "mac": "cmd+shift+e",
+        "when": "editorHasSelection"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "pretest": "npm run compile && npm run lint",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "20.x",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.4.1",
+    "@typescript-eslint/parser": "^6.4.1",
+    "@vscode/test-electron": "^2.3.4",
+    "eslint": "^8.47.0",
+    "typescript": "^5.1.6",
+    "webpack-cli": "^6.0.1"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.27.0",
+    "openai": "^4.20.0"
+  }
+}
