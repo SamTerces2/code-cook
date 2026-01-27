@@ -239,12 +239,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     );
 
     return `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta
     http-equiv="Content-Security-Policy"
-    content="default-src 'none'; 
+    content="default-src 'none';
              script-src ${webview.cspSource} 'unsafe-inline';
              style-src ${webview.cspSource} 'unsafe-inline';
              img-src ${webview.cspSource} data:;
@@ -253,62 +254,107 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   >
   <link rel="stylesheet" href="${styleUri}">
   <link rel="stylesheet" href="${highlightCssUri}">
+  <title>Code Cook</title>
 </head>
 
 <body>
-  <div id="layout">
-    
-    <!-- LEFT TOOLBAR -->
-    <div id="sidebar">
-      <button class="sidebar-btn"><span class="icon">💬</span></button>
-      <button class="sidebar-btn"><span class="icon">📄</span></button>
-      <button class="sidebar-btn"><span class="icon">🔍</span></button>
-      <button class="sidebar-btn"><span class="icon">⚙️</span></button>
-    </div>
+  <div class="cc-root">
 
-    <!-- MAIN CHAT PANEL -->
-    <div id="chat-panel">
-
-      <!-- HEADER -->
-      <div id="chat-header">
-        <div class="title">Claude Cook</div>
-        <div class="model-dropdown">
-          <select id="modelSelect">
-            <option value="claude-3.5-sonnet">Claude 3.5 Sonnet</option>
-            <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
-            <option value="gpt-4o">GPT-4o</option>
-            <option value="llama-3.1">Llama 3.1</option>
-          </select>
+    <!-- HEADER -->
+    <header class="cc-header">
+      <div class="cc-header-left">
+        <div class="cc-logo">👨‍🍳</div>
+        <div class="cc-title">
+          <div class="cc-title-main">Code Cook</div>
+          <div class="cc-title-sub">AI Coding Assistant</div>
         </div>
       </div>
-
-      <!-- MESSAGES -->
-      <div id="messages"></div>
-
-      <!-- TYPING INDICATOR -->
-      <div id="typing-indicator" class="hidden">
-        <div class="dot"></div>
-        <div class="dot"></div>
-        <div class="dot"></div>
+      <div class="cc-header-center">
+        <div id="cc-provider" class="cc-provider-badge">
+          <span class="cc-provider-dot"></span>
+          <span>Loading...</span>
+        </div>
       </div>
-
-      <!-- INPUT BAR -->
-      <div id="input-container">
-        <button id="addContextBtn">📎 Add Context</button>
-
-        <textarea id="chat-input" placeholder="Describe what to build next"></textarea>
-        
-       <button id="sendBtn">
-  <span class="send-label">Send</span>
-  <span class="send-loader hidden">
-    <span class="dot"></span>
-    <span class="dot"></span>
-    <span class="dot"></span>
-  </span>
-</button>
-
+      <div class="cc-header-right">
+        <button id="cc-search-btn" class="cc-btn cc-btn-ghost cc-btn-icon" title="Search Messages">
+          🔍
+        </button>
+        <button id="cc-switch" class="cc-btn cc-btn-ghost" title="Switch AI Provider">
+          Switch
+        </button>
+        <button id="cc-clear" class="cc-btn cc-btn-ghost" title="Clear Chat">
+          Clear
+        </button>
       </div>
+    </header>
 
+    <!-- SEARCH BAR -->
+    <div id="cc-search" class="cc-search">
+      <div class="cc-search-input-wrapper">
+        <span class="cc-search-icon">🔍</span>
+        <input
+          type="text"
+          id="cc-search-input"
+          class="cc-search-input"
+          placeholder="Search messages..."
+          autocomplete="off"
+        />
+        <span id="cc-search-count" class="cc-search-count"></span>
+        <button id="cc-search-close" class="cc-btn cc-btn-ghost cc-btn-icon" title="Close">✕</button>
+      </div>
+    </div>
+
+    <!-- MESSAGES -->
+    <main id="cc-messages" class="cc-messages" role="main">
+      <div class="cc-welcome">
+        <div class="cc-welcome-icon">👨‍🍳</div>
+        <div class="cc-welcome-title">Welcome to Code Cook</div>
+        <div class="cc-welcome-subtitle">
+          Your intelligent AI coding assistant. Ask me anything about your code!
+        </div>
+        <div class="cc-welcome-tips">
+          <div class="cc-tip">
+            <span class="cc-tip-icon">💡</span>
+            <span>Ask me to explain code, fix bugs, or generate new functions</span>
+          </div>
+          <div class="cc-tip">
+            <span class="cc-tip-icon">⚡</span>
+            <span>Use <strong>Ctrl+Enter</strong> to send messages quickly</span>
+          </div>
+          <div class="cc-tip">
+            <span class="cc-tip-icon">🔍</span>
+            <span>Search through your conversation history anytime</span>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- INPUT AREA -->
+    <footer class="cc-footer">
+      <div class="cc-input-container">
+        <div class="cc-input-wrapper">
+          <textarea
+            id="cc-input"
+            class="cc-input"
+            placeholder="Ask Code Cook anything..."
+            rows="1"
+            aria-label="Message input"
+          ></textarea>
+        </div>
+        <button id="cc-send" class="cc-btn cc-btn-primary cc-btn-send" aria-label="Send message">
+          <span class="cc-btn-text">Send</span>
+          <span class="cc-spinner"></span>
+        </button>
+      </div>
+    </footer>
+
+    <!-- STATUS BAR -->
+    <div class="cc-status-bar">
+      <div class="cc-status-text">
+        <span class="cc-status-indicator"></span>
+        <span id="cc-status">Ready</span>
+      </div>
+      <button id="cc-configure" class="cc-link">Settings</button>
     </div>
 
   </div>

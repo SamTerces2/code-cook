@@ -1,200 +1,447 @@
-// media/main.js
+// Code Cook - Modern UI JavaScript
+// Inspired by Claude/Copilot interface
 
 (function () {
   const vscode = acquireVsCodeApi();
 
-  // Build UI structure
-  document.body.innerHTML = `
-    <div class="cc-root">
-      <header class="cc-header">
-        <div class="cc-header-left">
-          <div class="cc-title">CODE COOK</div>
-          <div class="cc-subtitle">AI Assistant for VS Code</div>
-        </div>
-        <div class="cc-header-right">
-          <span id="cc-provider-pill" class="cc-provider-pill">Loading model...</span>
-          <button id="cc-switch-provider" class="cc-ghost-button" title="Switch Model">
-            Switch
-          </button>
-          <button id="cc-clear" class="cc-ghost-button">
-            Clear
-          </button>
-        </div>
-      </header>
+  // DOM Elements
+  const elements = {
+    messages: document.getElementById("cc-messages"),
+    input: document.getElementById("cc-input"),
+    sendBtn: document.getElementById("cc-send"),
+    clearBtn: document.getElementById("cc-clear"),
+    switchBtn: document.getElementById("cc-switch"),
+    searchBtn: document.getElementById("cc-search-btn"),
+    searchContainer: document.getElementById("cc-search"),
+    searchInput: document.getElementById("cc-search-input"),
+    searchClose: document.getElementById("cc-search-close"),
+    searchCount: document.getElementById("cc-search-count"),
+    status: document.getElementById("cc-status"),
+    statusIndicator: document.querySelector(".cc-status-indicator"),
+    provider: document.getElementById("cc-provider"),
+    configure: document.getElementById("cc-configure"),
+  };
 
-      <main id="cc-messages" class="cc-messages"></main>
+  // State
+  const state = {
+    messages: [],
+    currentAssistantBubble: null,
+    searchMatches: [],
+    searchIndex: -1,
+    isLoading: false,
+  };
 
-      <footer class="cc-footer">
-        <div class="cc-input-wrapper">
-          <textarea
-            id="cc-input"
-            class="cc-input"
-            rows="1"
-            placeholder="Ask Code Cook anything about your code..."
-          ></textarea>
-        </div>
-       <button id="cc-send" class="cc-primary-button">
-  <span class="cc-send-label">Send</span>
-  <span class="cc-send-loader hidden">
-    <span class="cc-dot"></span>
-    <span class="cc-dot"></span>
-    <span class="cc-dot"></span>
-  </span>
-</button>
+  // ==================== UTILITY FUNCTIONS ====================
 
-      </footer>
-
-      <div class="cc-status-bar">
-        <span id="cc-status">Ready</span>
-        <button id="cc-configure" class="cc-link-button">API & Settings…</button>
-      </div>
-    </div>
-  `;
-
-  const messagesEl = document.getElementById("cc-messages");
-  const inputEl = document.getElementById("cc-input");
-  const sendBtn = document.getElementById("cc-send");
-  const clearBtn = document.getElementById("cc-clear");
-  const statusEl = document.getElementById("cc-status");
-  const switchProviderBtn = document.getElementById("cc-switch-provider");
-  const providerPill = document.getElementById("cc-provider-pill");
-  const configureBtn = document.getElementById("cc-configure");
-
-  let currentAssistantBubble = null;
-
-  function scrollToBottom() {
+  function scrollToBottom(smooth = true) {
     requestAnimationFrame(() => {
-      messagesEl.scrollTop = messagesEl.scrollHeight;
+      elements.messages.scrollTo({
+        top: elements.messages.scrollHeight,
+        behavior: smooth ? "smooth" : "auto",
+      });
     });
   }
 
-  function createMessageBubble(text, role) {
-    const wrapper = document.createElement("div");
-    wrapper.className =
-      "cc-message-row " +
-      (role === "user" ? "cc-message-row-user" : "cc-message-row-assistant");
-
-    const bubble = document.createElement("div");
-    bubble.className =
-      "cc-bubble " +
-      (role === "user" ? "cc-bubble-user" : "cc-bubble-assistant");
-
-    const pre = document.createElement("pre");
-    pre.className = "cc-bubble-text";
-    pre.textContent = text;
-
-    bubble.appendChild(pre);
-    wrapper.appendChild(bubble);
-    messagesEl.appendChild(wrapper);
-    scrollToBottom();
-    return { wrapper, bubble, pre };
+  function formatTime() {
+    const now = new Date();
+    return now.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
   }
 
-  function showUserMessage(text) {
-    createMessageBubble(text, "user");
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function processMarkdown(text) {
+    if (typeof marked === "undefined") {
+      return escapeHtml(text).replace(/\n/g, "<br>");
+    }
+
+    marked.setOptions({
+      highlight: function (code, lang) {
+        if (typeof hljs !== "undefined" && lang && hljs.getLanguage(lang)) {
+          try {
+            return hljs.highlight(code, { language: lang }).value;
+          } catch (err) {
+            console.error("Highlight error:", err);
+          }
+        }
+        return escapeHtml(code);
+      },
+      breaks: true,
+      gfm: true,
+    });
+
+    return marked.parse(text);
+  }
+
+  // ==================== MESSAGE FUNCTIONS ====================
+
+  function createMessage(text, role) {
+    // Remove welcome screen
+    const welcome = elements.messages.querySelector(".cc-welcome");
+    if (welcome) {
+      welcome.remove();
+    }
+
+    const message = document.createElement("div");
+    message.className = `cc-message cc-message-${role}`;
+    message.dataset.role = role;
+    message.dataset.timestamp = Date.now();
+
+    const avatar = document.createElement("div");
+    avatar.className = "cc-message-avatar";
+    avatar.textContent = role === "user" ? "👤" : "👨‍🍳";
+
+    const content = document.createElement("div");
+    content.className = "cc-message-content";
+
+    const bubble = document.createElement("div");
+    bubble.className = "cc-message-bubble";
+
+    if (role === "user") {
+      bubble.textContent = text;
+    } else {
+      bubble.innerHTML = processMarkdown(text);
+    }
+
+    const meta = document.createElement("div");
+    meta.className = "cc-message-meta";
+
+    const time = document.createElement("span");
+    time.className = "cc-message-time";
+    time.textContent = formatTime();
+
+    const actions = document.createElement("div");
+    actions.className = "cc-message-actions";
+
+    // Copy button
+    const copyBtn = document.createElement("button");
+    copyBtn.className = "cc-action-btn";
+    copyBtn.innerHTML = "📋 Copy";
+    copyBtn.onclick = () => copyMessage(text, copyBtn);
+    actions.appendChild(copyBtn);
+
+    // Regenerate button for assistant messages
+    if (role === "assistant") {
+      const regenBtn = document.createElement("button");
+      regenBtn.className = "cc-action-btn";
+      regenBtn.innerHTML = "🔄 Regenerate";
+      regenBtn.onclick = () => regenerateMessage(message);
+      actions.appendChild(regenBtn);
+    }
+
+    meta.appendChild(time);
+    meta.appendChild(actions);
+
+    content.appendChild(bubble);
+    content.appendChild(meta);
+
+    message.appendChild(avatar);
+    message.appendChild(content);
+
+    elements.messages.appendChild(message);
+
+    state.messages.push({
+      text,
+      role,
+      element: message,
+      bubble,
+    });
+
+    scrollToBottom();
+
+    return { message, bubble, content };
+  }
+
+  function copyMessage(text, button) {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        const originalHtml = button.innerHTML;
+        button.innerHTML = "✓ Copied";
+        button.classList.add("success");
+
+        setTimeout(() => {
+          button.innerHTML = originalHtml;
+          button.classList.remove("success");
+        }, 2000);
+      })
+      .catch((err) => {
+        console.error("Copy failed:", err);
+        setStatus("Failed to copy");
+      });
+  }
+
+  function regenerateMessage(messageElement) {
+    const index = state.messages.findIndex((m) => m.element === messageElement);
+    if (index > 0 && state.messages[index - 1].role === "user") {
+      const userMessage = state.messages[index - 1].text;
+
+      // Remove assistant message
+      messageElement.remove();
+      state.messages.splice(index, 1);
+
+      // Resend
+      vscode.postMessage({
+        type: "sendMessage",
+        message: userMessage,
+      });
+
+      setLoading(true);
+    }
   }
 
   function startAssistantMessage() {
-    const bubbleObj = createMessageBubble("", "assistant");
-    currentAssistantBubble = bubbleObj.pre;
+    const msg = createMessage("", "assistant");
+    state.currentAssistantBubble = msg.bubble;
+
+    // Show typing indicator
+    msg.bubble.innerHTML = `
+      <div class="cc-typing">
+        <div class="cc-typing-dot"></div>
+        <div class="cc-typing-dot"></div>
+        <div class="cc-typing-dot"></div>
+      </div>
+    `;
+
+    return msg;
   }
 
-  function appendAssistantChunk(chunk) {
-    if (!currentAssistantBubble) {
+  function appendToAssistant(chunk) {
+    if (!state.currentAssistantBubble) {
       startAssistantMessage();
     }
-    currentAssistantBubble.textContent += chunk;
+
+    // Get current text content
+    const lastMsg = state.messages[state.messages.length - 1];
+    if (lastMsg && lastMsg.role === "assistant") {
+      lastMsg.text += chunk;
+      state.currentAssistantBubble.innerHTML = processMarkdown(lastMsg.text);
+    }
+
     scrollToBottom();
   }
 
   function clearMessages() {
-    messagesEl.innerHTML = "";
-    currentAssistantBubble = null;
+    elements.messages.innerHTML = `
+      <div class="cc-welcome">
+        <div class="cc-welcome-icon">👨‍🍳</div>
+        <div class="cc-welcome-title">Welcome to Code Cook</div>
+        <div class="cc-welcome-subtitle">
+          Your intelligent AI coding assistant. Ask me anything about your code!
+        </div>
+        <div class="cc-welcome-tips">
+          <div class="cc-tip">
+            <span class="cc-tip-icon">💡</span>
+            <span>Ask me to explain code, fix bugs, or generate new functions</span>
+          </div>
+          <div class="cc-tip">
+            <span class="cc-tip-icon">⚡</span>
+            <span>Use <strong>Ctrl+Enter</strong> to send messages quickly</span>
+          </div>
+          <div class="cc-tip">
+            <span class="cc-tip-icon">🔍</span>
+            <span>Search through your conversation history anytime</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    state.messages = [];
+    state.currentAssistantBubble = null;
+    clearSearch();
   }
 
-  function setLoading(isLoading) {
-    if (isLoading) {
-      statusEl.textContent = "Thinking…";
-      sendBtn.disabled = true;
+  // ==================== SEARCH FUNCTIONS ====================
 
-      sendBtn.classList.add("loading");
-      sendBtn.querySelector(".cc-send-loader").classList.remove("hidden");
-      sendBtn.querySelector(".cc-send-label").classList.add("hidden");
+  function toggleSearch() {
+    const isActive = elements.searchContainer.classList.toggle("active");
+    if (isActive) {
+      elements.searchInput.focus();
     } else {
-      statusEl.textContent = "Ready";
-      sendBtn.disabled = false;
-
-      sendBtn.classList.remove("loading");
-      sendBtn.querySelector(".cc-send-loader").classList.add("hidden");
-      sendBtn.querySelector(".cc-send-label").classList.remove("hidden");
+      elements.searchInput.value = "";
+      clearSearch();
     }
   }
 
+  function performSearch() {
+    const query = elements.searchInput.value.toLowerCase().trim();
+
+    clearSearch();
+
+    if (!query) {
+      elements.searchCount.textContent = "";
+      return;
+    }
+
+    state.messages.forEach((msg, idx) => {
+      if (msg.text.toLowerCase().includes(query)) {
+        state.searchMatches.push(idx);
+        msg.element.classList.add("cc-search-highlight");
+      }
+    });
+
+    if (state.searchMatches.length > 0) {
+      elements.searchCount.textContent = `${state.searchMatches.length}`;
+      state.searchIndex = 0;
+      highlightSearchMatch(0);
+    } else {
+      elements.searchCount.textContent = "0";
+    }
+  }
+
+  function highlightSearchMatch(index) {
+    // Remove active class from all
+    state.messages.forEach((msg) => {
+      msg.element.classList.remove("active");
+    });
+
+    if (state.searchMatches.length === 0) return;
+
+    const msgIndex = state.searchMatches[index];
+    const element = state.messages[msgIndex].element;
+    element.classList.add("active");
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function clearSearch() {
+    state.messages.forEach((msg) => {
+      msg.element.classList.remove("cc-search-highlight", "active");
+    });
+    state.searchMatches = [];
+    state.searchIndex = -1;
+  }
+
+  // ==================== UI STATE FUNCTIONS ====================
+
+  function setLoading(loading) {
+    state.isLoading = loading;
+
+    if (loading) {
+      elements.sendBtn.disabled = true;
+      elements.input.disabled = true;
+      elements.sendBtn.classList.add("loading");
+      elements.statusIndicator.classList.add("active");
+      setStatus("Thinking...");
+    } else {
+      elements.sendBtn.disabled = false;
+      elements.input.disabled = false;
+      elements.sendBtn.classList.remove("loading");
+      elements.statusIndicator.classList.remove("active");
+      setStatus("Ready");
+      state.currentAssistantBubble = null;
+    }
+  }
+
+  function setStatus(text) {
+    elements.status.textContent = text;
+  }
+
+  function updateProvider(provider, model) {
+    const providerText = elements.provider.querySelector("span:last-child");
+    if (providerText) {
+      providerText.textContent = `${provider} · ${model}`;
+    }
+  }
+
+  // ==================== INPUT FUNCTIONS ====================
+
   function sendMessage() {
-    const text = inputEl.value.trim();
-    if (!text) return;
+    const text = elements.input.value.trim();
+    if (!text || state.isLoading) return;
 
     vscode.postMessage({
       type: "sendMessage",
       message: text,
     });
 
-    // Important: DO NOT add the bubble here.
-    // We'll render it only when the extension sends "userMessage".
-    inputEl.value = "";
-    inputEl.rows = 1;
+    elements.input.value = "";
+    autoResize();
     setLoading(true);
   }
 
-  // --- Event wiring ---
+  function autoResize() {
+    elements.input.style.height = "auto";
+    const newHeight = Math.min(elements.input.scrollHeight, 120);
+    elements.input.style.height = newHeight + "px";
+  }
 
-  sendBtn.addEventListener("click", () => {
-    sendMessage();
-  });
+  // ==================== EVENT LISTENERS ====================
 
-  inputEl.addEventListener("keydown", (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+  // Send button
+  elements.sendBtn.addEventListener("click", sendMessage);
+
+  // Input
+  elements.input.addEventListener("input", autoResize);
+
+  elements.input.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
       sendMessage();
-      return;
     }
-
-    // Auto-resize
-    setTimeout(() => {
-      inputEl.style.height = "auto";
-      inputEl.style.height = inputEl.scrollHeight + "px";
-    }, 0);
   });
 
-  clearBtn.addEventListener("click", () => {
+  // Clear button
+  elements.clearBtn.addEventListener("click", () => {
     vscode.postMessage({ type: "clearChat" });
   });
 
-  switchProviderBtn.addEventListener("click", () => {
+  // Switch button
+  elements.switchBtn.addEventListener("click", () => {
     vscode.postMessage({ type: "switchProvider" });
   });
 
-  configureBtn.addEventListener("click", () => {
+  // Configure button
+  elements.configure.addEventListener("click", () => {
     vscode.postMessage({ type: "configureKeys" });
   });
 
-  // --- Messages from extension ---
+  // Search
+  elements.searchBtn.addEventListener("click", toggleSearch);
+
+  elements.searchClose.addEventListener("click", () => {
+    elements.searchContainer.classList.remove("active");
+    clearSearch();
+  });
+
+  elements.searchInput.addEventListener("input", performSearch);
+
+  elements.searchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      elements.searchContainer.classList.remove("active");
+      clearSearch();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (state.searchMatches.length > 0) {
+        state.searchIndex = (state.searchIndex + 1) % state.searchMatches.length;
+        highlightSearchMatch(state.searchIndex);
+      }
+    }
+  });
+
+  // ==================== MESSAGE HANDLER ====================
 
   window.addEventListener("message", (event) => {
     const message = event.data;
 
     switch (message.type) {
       case "userMessage":
-        showUserMessage(message.message);
+        createMessage(message.message, "user");
         break;
 
       case "streamChunk":
-        appendAssistantChunk(message.chunk);
+        appendToAssistant(message.chunk);
         break;
 
       case "startLoading":
         setLoading(true);
-        currentAssistantBubble = null;
+        startAssistantMessage();
         break;
 
       case "stopLoading":
@@ -207,22 +454,37 @@
 
       case "updateProvider":
         if (message.provider && message.model) {
-          providerPill.textContent = `${message.provider} · ${message.model}`;
+          updateProvider(message.provider, message.model);
         }
         break;
 
       case "error":
         setLoading(false);
-        statusEl.textContent = "Error: " + (message.message || "Unknown");
+        setStatus("Error occurred");
+
+        const errorMsg = createMessage(
+          `⚠️ Error: ${message.message || "Something went wrong. Please try again."}`,
+          "assistant"
+        );
+        errorMsg.bubble.style.borderColor = "var(--error)";
+        errorMsg.bubble.style.background = "rgba(248, 113, 113, 0.05)";
         break;
 
       case "prefillMessage":
-        inputEl.value = message.message || "";
-        inputEl.focus();
-        break;
-
-      default:
+        elements.input.value = message.message || "";
+        autoResize();
+        elements.input.focus();
         break;
     }
   });
+
+  // ==================== INITIALIZATION ====================
+
+  // Focus input on load
+  elements.input.focus();
+
+  // Set initial status
+  setStatus("Ready");
+
+  console.log("🍳 Code Cook initialized with modern UI");
 })();
